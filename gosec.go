@@ -59,7 +59,11 @@ func main() {
 		return
 	}
 
-	ctx.FindRegex(*grepStringPtr)
+	err = ctx.FindRegex(*grepStringPtr)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 }
 
 type SecureContext struct {
@@ -203,9 +207,10 @@ func (ctx *SecureContext) DecryptFile(filePath string, regex *regexp.Regexp) (*o
 	promptCallback := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
 		for _, k := range keys {
 			err := k.PrivateKey.Decrypt([]byte(ctx.Password))
-			if err == nil {
-				return nil, nil
+			if err != nil {
+				return nil, err
 			}
+			return nil, nil
 		}
 		return nil, errors.New("invalid password or no private key")
 	}
