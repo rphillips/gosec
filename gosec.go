@@ -39,14 +39,7 @@ var DefaultPrompt = "password: "
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
 	grepStringPtr := flag.String("g", "", "Regex String")
-	recipientEmailPtr := flag.String("r", "", "Recipient Email")
 	flag.Parse()
-
-	if *recipientEmailPtr == "" {
-		Usage()
-		fmt.Println("Recipient email must be specified")
-		os.Exit(1)
-	}
 
 	if *directoryRootPtr == "" {
 		Usage()
@@ -56,7 +49,6 @@ func main() {
 
 	ctx := NewSecureContext(
 		DefaultSecureRingPath,
-		*recipientEmailPtr,
 		*directoryRootPtr,
 	)
 
@@ -81,7 +73,6 @@ func main() {
 
 type SecureContext struct {
 	SecureRingPath string
-	EmailRecipient string
 	DirectoryRoot  string
 
 	PrivateRing openpgp.EntityList
@@ -90,10 +81,9 @@ type SecureContext struct {
 	SearchRegex *regexp.Regexp
 }
 
-func NewSecureContext(secureRingPath, emailRecipient, directoryRoot string) *SecureContext {
+func NewSecureContext(secureRingPath, directoryRoot string) *SecureContext {
 	return &SecureContext{
 		SecureRingPath: secureRingPath,
-		EmailRecipient: emailRecipient,
 		DirectoryRoot:  directoryRoot,
 	}
 }
@@ -193,10 +183,10 @@ func (ctx *SecureContext) FindRegex(regexStr string) error {
 	return nil
 }
 
-func (ctx *SecureContext) GetKeyByEmail() *openpgp.Entity {
+func (ctx *SecureContext) GetKeyByEmail(emailAddress string) *openpgp.Entity {
 	for _, entity := range ctx.PrivateRing {
 		for _, ident := range entity.Identities {
-			if ident.UserId.Email == ctx.EmailRecipient {
+			if ident.UserId.Email == emailAddress {
 				return entity
 			}
 		}
@@ -216,13 +206,6 @@ func (ctx *SecureContext) DecryptFile(filePath string, regex *regexp.Regexp) (*o
 		return nil, err
 	}
 
-	recipientEntity := ctx.GetKeyByEmail()
-	if recipientEntity == nil {
-		return nil, errors.New("Invalid Recipient")
-	}
-
-	ents := openpgp.EntityList([]*openpgp.Entity{recipientEntity})
-
 	promptCallback := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
 		for _, k := range keys {
 			err := k.PrivateKey.Decrypt([]byte(ctx.Password))
@@ -234,7 +217,7 @@ func (ctx *SecureContext) DecryptFile(filePath string, regex *regexp.Regexp) (*o
 		return nil, errors.New("invalid password or no private key")
 	}
 
-	return openpgp.ReadMessage(block.Body, ents, promptCallback, nil)
+	return openpgp.ReadMessage(block.Body, ctx.PrivateRing, promptCallback, nil)
 }
 
 func expandPath(p string) (string, error) {
