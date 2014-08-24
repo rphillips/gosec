@@ -152,21 +152,27 @@ func (ctx *SecureContext) FindRegex(regexStr string) error {
 		}
 
 		if regex != nil {
-			first := true
-			lineNumber := 0
-			foundMatch := false
+			newWriteLine := func(path string) func(uint64, string) {
+				first := true
+				return func(lineNumber uint64, line string) {
+					if first {
+						fmt.Println(path)
+						first = false
+					}
+					fmt.Printf("%v:%v\n", lineNumber, line)
+				}
+			}
 
+			foundMatch := false
+			lineNumber := uint64(0)
+			writeLine := newWriteLine(path)
 			scanner := bufio.NewScanner(md.UnverifiedBody)
 			for scanner.Scan() {
 				lineNumber++
 				line := scanner.Text()
 				if regex.Match([]byte(line)) {
 					foundMatch = true
-					if first {
-						fmt.Println(path)
-						first = false
-					}
-					fmt.Printf("%v:%v\n", lineNumber, line)
+					writeLine(lineNumber, line)
 				}
 			}
 
