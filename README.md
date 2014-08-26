@@ -1,4 +1,6 @@
-# Gosec
+## Gosec
+
+[![Build Status](https://travis-ci.org/rphillips/gosec.svg?branch=master)](https://travis-ci.org/rphillips/gosec)
 
 ## Install
 
@@ -7,19 +9,19 @@ go get https://github.com/rphillips/gosec
 
 ```
 
-## Binary Install (OSX)
+### Binary Install (OSX)
 
 ```bash
 wget http://gobuild.io/github.com/rphillips/gosec/master/darwin/amd64 -O output.zip
 ```
 
-## Binary Install (Windows)
+### Binary Install (Windows)
 
 ```bash
 wget http://gobuild.io/github.com/rphillips/gosec/master/windows/amd64 -O output.zip
 ```
 
-## Binary Install (Linux)
+### Binary Install (Linux)
 
 ```bash
 wget http://gobuild.io/github.com/rphillips/gosec/master/linux/amd64 -O output.zip
