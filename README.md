@@ -28,6 +28,11 @@ wget http://gobuild.io/github.com/rphillips/gosec/master/linux/amd64 -O output.z
 ## Usage
 
 ```bash
-gosec -g [grep term] -s [subproject]
+Usage of ./gosec:
+-d=false: Decrypt
+-e=false: Encrypt
+-g="": Regex String
+-s="": Directory
+Root directory must be specified
 ```
 
