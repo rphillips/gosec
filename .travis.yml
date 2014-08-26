@@ -8,6 +8,7 @@ go:
 
 before_install:
  - go get github.com/tools/godep
+ - export PATH=$HOME/gopath/bin:$PATH
 
 script:
  - godep go build
