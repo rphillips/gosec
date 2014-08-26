@@ -34,12 +34,14 @@ import (
 )
 
 var DefaultSecureRingPath = "~/.gnupg/secring.gpg"
+var DefaultPublicRingPath = "~/.gnupg/pubring.gpg"
 var DefaultPrompt = "password: "
 
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
 	grepStringPtr := flag.String("g", "", "Regex String")
 	decryptFlagPtr := flag.Bool("d", false, "Decrypt")
+	encryptFlagPtr := flag.Bool("e", false, "Encrypt")
 	flag.Parse()
 
 	if *directoryRootPtr == "" {
@@ -50,6 +52,7 @@ func main() {
 
 	ctx := NewSecureContext(
 		DefaultSecureRingPath,
+		DefaultPublicRingPath,
 		*directoryRootPtr,
 	)
 
@@ -74,6 +77,15 @@ func main() {
 		return
 	}
 
+	if *encryptFlagPtr == true {
+		err = ctx.EncryptRoot()
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		return
+	}
+
 	err = ctx.FindRegex(*grepStringPtr)
 	if err != nil {
 		log.Fatal(err)
@@ -83,17 +95,20 @@ func main() {
 
 type SecureContext struct {
 	SecureRingPath string
+	PubRingPath    string
 	DirectoryRoot  string
 
 	PrivateRing openpgp.EntityList
+	PublicRing  openpgp.EntityList
 	Password    string
 
 	SearchRegex *regexp.Regexp
 }
 
-func NewSecureContext(secureRingPath, directoryRoot string) *SecureContext {
+func NewSecureContext(secureRingPath, pubRingPath, directoryRoot string) *SecureContext {
 	return &SecureContext{
 		SecureRingPath: secureRingPath,
+		PubRingPath:    pubRingPath,
 		DirectoryRoot:  directoryRoot,
 	}
 }
@@ -121,7 +136,15 @@ func (ctx *SecureContext) ReadKeyRing() error {
 		return err
 	}
 
-	return nil
+	pubringPath, _ := expandPath(ctx.PubRingPath)
+	pubringFile, err := os.Open(pubringPath)
+	if err != nil {
+		return err
+	}
+	defer pubringFile.Close()
+
+	ctx.PublicRing, err = openpgp.ReadKeyRing(pubringFile)
+	return err
 }
 
 func (ctx *SecureContext) FindRegex(regexStr string) error {
@@ -187,21 +210,101 @@ func (ctx *SecureContext) FindRegex(regexStr string) error {
 	}
 
 	filesPath := path.Join(ctx.DirectoryRoot, "files")
-	if err = filepath.Walk(filesPath, fileCallback); err != nil {
-		return err
-	}
-	return nil
+	return filepath.Walk(filesPath, fileCallback)
 }
 
-func (ctx *SecureContext) GetKeyByEmail(emailAddress string) *openpgp.Entity {
-	for _, entity := range ctx.PrivateRing {
+func GetKeyByEmail(keyRing openpgp.EntityList, emailAddress string) *openpgp.Entity {
+	for _, entity := range keyRing {
 		for _, ident := range entity.Identities {
 			if ident.UserId.Email == emailAddress {
+				if entity.PrimaryKey.PublicKey == nil {
+					return nil
+				}
 				return entity
 			}
 		}
 	}
 	return nil
+}
+
+func (ctx *SecureContext) ReadAccessList() (openpgp.EntityList, error) {
+	fp, err := os.Open(path.Join(ctx.DirectoryRoot, "access-list.conf"))
+	if err != nil {
+		return nil, err
+	}
+	defer fp.Close()
+
+	commentRegex, err := regexp.Compile("^#")
+	if err != nil {
+		return nil, err
+	}
+
+	entityList := openpgp.EntityList{}
+
+	scanner := bufio.NewScanner(fp)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if commentRegex.Match([]byte(line)) {
+			continue
+		}
+		entity := GetKeyByEmail(ctx.PublicRing, strings.TrimSpace(line))
+		if entity == nil {
+			return nil, errors.New(line + " not in keyring")
+		}
+		entityList = append(entityList, entity)
+	}
+	return entityList, nil
+}
+
+func (ctx *SecureContext) EncryptRoot() error {
+	entityList, err := ctx.ReadAccessList()
+	if err != nil {
+		return err
+	}
+
+	fileCallback := func(filePath string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if fi.IsDir() {
+			return nil
+		}
+		if filepath.Ext(fi.Name()) != ".txt" {
+			return nil
+		}
+
+		fp, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer fp.Close()
+
+		filePath = strings.Replace(filePath, ".txt", ".gpg", 1)
+		destPath := path.Join(ctx.DirectoryRoot, "files", filepath.Base(filePath))
+
+		destFp, err := os.Create(destPath)
+		if err != nil {
+			return err
+		}
+		defer destFp.Close()
+
+		w, err := armor.Encode(destFp, "PGP MESSAGE", nil)
+		if err != nil {
+			return err
+		}
+		defer w.Close()
+
+		cleartext, err := openpgp.Encrypt(w, entityList, nil, nil, nil)
+		if err != nil {
+			return err
+		}
+		io.Copy(cleartext, fp)
+		cleartext.Close()
+
+		return nil
+	}
+
+	return filepath.Walk(ctx.DirectoryRoot, fileCallback)
 }
 
 func (ctx *SecureContext) DecryptRoot() error {
@@ -229,16 +332,12 @@ func (ctx *SecureContext) DecryptRoot() error {
 			return err
 		}
 		defer fp.Close()
-		io.Copy(fp, md.UnverifiedBody)
-
-		return nil
+		_, err = io.Copy(fp, md.UnverifiedBody)
+		return err
 	}
 
 	filesPath := path.Join(ctx.DirectoryRoot, "files")
-	if err := filepath.Walk(filesPath, fileCallback); err != nil {
-		return err
-	}
-	return nil
+	return filepath.Walk(filesPath, fileCallback)
 }
 
 func (ctx *SecureContext) DecryptFile(filePath string) (*openpgp.MessageDetails, error) {
@@ -246,7 +345,6 @@ func (ctx *SecureContext) DecryptFile(filePath string) (*openpgp.MessageDetails,
 	if err != nil {
 		return nil, err
 	}
-	defer secfile.Close()
 
 	block, err := armor.Decode(secfile)
 	if err != nil {
