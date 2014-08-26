@@ -39,6 +39,7 @@ var DefaultPrompt = "password: "
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
 	grepStringPtr := flag.String("g", "", "Regex String")
+	decryptFlagPtr := flag.Bool("d", false, "Decrypt")
 	flag.Parse()
 
 	if *directoryRootPtr == "" {
@@ -61,6 +62,15 @@ func main() {
 	_, err = ctx.GetPassword()
 	if err != nil {
 		log.Fatal(err)
+		return
+	}
+
+	if *decryptFlagPtr == true {
+		err = ctx.DecryptRoot()
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 		return
 	}
 
@@ -136,7 +146,7 @@ func (ctx *SecureContext) FindRegex(regexStr string) error {
 			return nil
 		}
 
-		md, err := ctx.DecryptFile(path, regex)
+		md, err := ctx.DecryptFile(path)
 		if err != nil {
 			return err
 		}
@@ -194,7 +204,44 @@ func (ctx *SecureContext) GetKeyByEmail(emailAddress string) *openpgp.Entity {
 	return nil
 }
 
-func (ctx *SecureContext) DecryptFile(filePath string, regex *regexp.Regexp) (*openpgp.MessageDetails, error) {
+func (ctx *SecureContext) DecryptRoot() error {
+	fileCallback := func(filePath string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if fi.IsDir() {
+			return nil
+		}
+		if filepath.Ext(fi.Name()) != ".gpg" {
+			return nil
+		}
+		md, err := ctx.DecryptFile(filePath)
+		if err != nil {
+			return err
+		}
+
+		baseName := filepath.Base(filePath)
+		newBase := strings.Replace(baseName, ".gpg", ".txt", 1)
+		newFilePath := path.Join(ctx.DirectoryRoot, newBase)
+
+		fp, err := os.Create(newFilePath)
+		if err != nil {
+			return err
+		}
+		defer fp.Close()
+		io.Copy(fp, md.UnverifiedBody)
+
+		return nil
+	}
+
+	filesPath := path.Join(ctx.DirectoryRoot, "files")
+	if err := filepath.Walk(filesPath, fileCallback); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ctx *SecureContext) DecryptFile(filePath string) (*openpgp.MessageDetails, error) {
 	secfile, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
