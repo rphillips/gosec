@@ -30,3 +30,4 @@ wget http://gobuild.io/github.com/rphillips/gosec/master/linux/amd64 -O output.z
 ```bash
 gosec -g [grep term] -s [subproject]
 ```
+
