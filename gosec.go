@@ -36,13 +36,20 @@ import (
 var DefaultSecureRingPath = "~/.gnupg/secring.gpg"
 var DefaultPublicRingPath = "~/.gnupg/pubring.gpg"
 var DefaultPrompt = "password: "
+var DefaultVersion = "0.1.0+git"
 
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
 	grepStringPtr := flag.String("g", "", "Regex String")
 	decryptFlagPtr := flag.Bool("d", false, "Decrypt")
 	encryptFlagPtr := flag.Bool("e", false, "Encrypt")
+	versionFlagPtr := flag.Bool("v", false, "Display Version")
 	flag.Parse()
+
+	if *versionFlagPtr {
+		Version()
+		os.Exit(0)
+	}
 
 	if *directoryRootPtr == "" {
 		Usage()
@@ -382,4 +389,8 @@ func expandPath(p string) (string, error) {
 var Usage = func() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 	flag.PrintDefaults()
+}
+
+var Version = func() {
+	fmt.Fprintf(os.Stdout, "%s\n", DefaultVersion)
 }
