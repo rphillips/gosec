@@ -36,7 +36,7 @@ import (
 var DefaultSecureRingPath = "~/.gnupg/secring.gpg"
 var DefaultPublicRingPath = "~/.gnupg/pubring.gpg"
 var DefaultPrompt = "password: "
-var DefaultVersion = "0.1.0+git"
+var DefaultVersion = "0.1.1+git"
 
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
@@ -287,7 +287,16 @@ func (ctx *SecureContext) EncryptRoot() error {
 		defer fp.Close()
 
 		filePath = strings.Replace(filePath, ".txt", ".gpg", 1)
-		destPath := path.Join(ctx.DirectoryRoot, "files", filepath.Base(filePath))
+		destRootPath := path.Join(ctx.DirectoryRoot, "files")
+		destPath := path.Join(destRootPath, filepath.Base(filePath))
+
+		_, err = os.Stat(destRootPath)
+		if err != nil {
+			err = os.Mkdir(destRootPath, 0700)
+			if err != nil {
+				return err
+			}
+		}
 
 		destFp, err := os.Create(destPath)
 		if err != nil {
