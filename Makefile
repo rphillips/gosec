@@ -1,10 +1,7 @@
-VERSION := 1.0.1
 LAST_TAG := $(shell git describe --abbrev=0 --tags)
-
 USER := rphillips
 EXECUTABLE := gosec
-
-GO15VENDOREXPERIMENT = 1
+GO15VENDOREXPERIMENT := 1
 
 # only include the amd64 binaries, otherwise the github release will become
 # too big
@@ -54,6 +51,7 @@ bin/windows/amd64/$(EXECUTABLE).exe:
 
 # git tag -a v$(RELEASE) -m 'release $(RELEASE)'
 release: $(COMPRESSED_EXECUTABLE_TARGETS)
+	make clean
 	git push && git push --tags
 	github-release release -u $(USER) -r $(EXECUTABLE) \
 		-t $(LAST_TAG) -n $(LAST_TAG) || true
