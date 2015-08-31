@@ -1,4 +1,4 @@
-// Copyright 2014 Ryan Phillips. All Rights Reserved.
+// Copyright 2015 Ryan Phillips. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,15 +28,15 @@ import (
 
 	"log"
 
-	"code.google.com/p/go.crypto/openpgp"
-	"code.google.com/p/go.crypto/openpgp/armor"
-	"code.google.com/p/gopass"
+	"github.com/bgentry/speakeasy"
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/armor"
 )
 
 var DefaultSecureRingPath = "~/.gnupg/secring.gpg"
 var DefaultPublicRingPath = "~/.gnupg/pubring.gpg"
 var DefaultPrompt = "password: "
-var DefaultVersion = "1.0.1"
+var version = "No version provided"
 
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
@@ -121,12 +121,12 @@ func NewSecureContext(secureRingPath, pubRingPath, directoryRoot string) *Secure
 }
 
 func (ctx *SecureContext) GetPassword() (string, error) {
+	var password string
 	var err error
-	ctx.Password, err = gopass.GetPass(DefaultPrompt)
-	if err != nil {
-		log.Fatal(err)
+	if password, err = speakeasy.Ask(DefaultPrompt); err != nil {
 		return "", err
 	}
+	ctx.Password = password
 	return ctx.Password, nil
 }
 
@@ -401,5 +401,5 @@ var Usage = func() {
 }
 
 var Version = func() {
-	fmt.Fprintf(os.Stdout, "%s\n", DefaultVersion)
+	fmt.Fprintf(os.Stdout, "%s\n", version)
 }
