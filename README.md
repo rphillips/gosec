@@ -30,5 +30,5 @@ Root directory must be specified
 ## Install
 
 ```bash
-go get https://github.com/rphillips/gosec
+GO15VENDOREXPERIMENT=1 godep get github.com/rphillips/gosec
 ```
