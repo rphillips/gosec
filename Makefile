@@ -22,7 +22,7 @@ all: $(EXECUTABLE)
 
 # the executable used to perform the upload, dogfooding and all...
 bin/tmp/$(EXECUTABLE):
-	go build -o "$@"
+	go build -o "$@" -ldflags "-X main.version=$(shell git describe --tags)"
 
 # arm
 bin/linux/arm/5/$(EXECUTABLE):
