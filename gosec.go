@@ -36,7 +36,7 @@ import (
 var DefaultSecureRingPath = "~/.gnupg/secring.gpg"
 var DefaultPublicRingPath = "~/.gnupg/pubring.gpg"
 var DefaultPrompt = "password: "
-var DefaultVersion = "1.0.0"
+var DefaultVersion = "1.0.1"
 
 func main() {
 	directoryRootPtr := flag.String("s", "", "Directory")
